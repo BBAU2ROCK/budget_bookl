@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `counter_amount` integer;

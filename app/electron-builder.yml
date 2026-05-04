@@ -1,0 +1,72 @@
+appId: com.jwchoo.budgetbook
+productName: BudgetBook
+copyright: Copyright © 2026 jwchoo
+# Use maximum LZMA2 compression for NSIS installer (slower build, smaller file)
+compression: maximum
+# Ship only Korean + English UI locales (saves ~40MB from locales/)
+electronLanguages:
+  - ko
+  - en-US
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!drizzle.config.ts'
+  - '!drizzle/**'
+  # Strip docs, tests, and build artifacts from bundled node_modules
+  - '!**/*.md'
+  - '!**/*.map'
+  - '!**/*.d.ts'
+  - '!**/{test,tests,__tests__,__mocks__,examples,example,docs,doc,benchmark}/**'
+  - '!**/{CHANGELOG,HISTORY,AUTHORS,CONTRIBUTING,UPGRADING,SECURITY}*'
+  - '!**/.github/**'
+  - '!**/tsconfig*.json'
+  - '!**/.eslintrc*'
+  - '!**/.prettierrc*'
+  - '!**/.npmignore'
+  - '!**/yarn.lock'
+  - '!**/package-lock.json'
+extraResources:
+  - from: drizzle
+    to: drizzle
+asarUnpack:
+  - resources/**
+  - node_modules/better-sqlite3/**
+win:
+  executableName: BudgetBook
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  displayLanguageSelector: true
+  deleteAppDataOnUninstall: false
+mac:
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    - NSCameraUsageDescription: Application requests access to the device's camera.
+    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
+    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
+    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+  notarize: false
+dmg:
+  artifactName: ${name}-${version}.${ext}
+linux:
+  target:
+    - AppImage
+    - snap
+    - deb
+  maintainer: electronjs.org
+  category: Utility
+appImage:
+  artifactName: ${name}-${version}.${ext}
+npmRebuild: false
+# publish: 자동 업데이트 채널 설정 — 활성화 전까지 null 유지
+publish: null

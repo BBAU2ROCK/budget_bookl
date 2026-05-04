@@ -1,0 +1,50 @@
+# Dependencies
+**/node_modules/
+
+# Build artifacts
+app/dist/
+app/out/
+app/build/*.exe
+app/build/*.exe.blockmap
+app/build/*.zip
+
+# TypeScript build cache
+**/*.tsbuildinfo
+**/.eslintcache
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# SQLite runtime DB (user data, never commit)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Claude local session/settings
+.claude/
+
+# Manual build temp (keep PDF + screenshots, drop intermediates)
+01_docs/manual/__pycache__/
+01_docs/manual/*.pyc
