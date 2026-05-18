@@ -95,13 +95,18 @@ function BudgetForm({
     setAmountStr(formatMoneyForInput(initial.amount, initial.currency, currencies))
   }, [initial, currencies])
 
-  // 예산은 최상위(루트) 지출 카테고리에만 설정한다 — 자식 카테고리에 한도를 잡으면
-  // "하위 카테고리 거래도 합산" 옵션이 의미가 모호해지고, 사용자가 같은 비용을 부모에
-  // 한 번 자식에 한 번 두 번 잡는 등의 혼동이 생긴다. 따라서 드롭다운은 루트만 노출.
+  // 지출 카테고리 트리를 모든 깊이까지 평탄화 (루트·자식 모두 선택 가능).
+  // depth 정보를 보존해 드롭다운에서 들여쓰기로 계층을 시각화한다.
+  // 아카이브된 노드와 그 서브트리는 스킵.
   const expenseCategoryOptions = useMemo<CategoryOption[]>(() => {
-    return categoryTree
-      .filter((n) => n.kind === 'expense' && !n.isArchived)
-      .map((n) => ({ id: n.id, name: n.name, icon: n.icon, depth: 0, path: n.path }))
+    const out: CategoryOption[] = []
+    const walk = (n: CategoryTreeNode): void => {
+      if (n.kind !== 'expense' || n.isArchived) return
+      out.push({ id: n.id, name: n.name, icon: n.icon, depth: n.depth, path: n.path })
+      n.children.forEach(walk)
+    }
+    categoryTree.forEach(walk)
+    return out
   }, [categoryTree])
 
   async function handleSubmit(): Promise<void> {
@@ -205,8 +210,8 @@ function BudgetForm({
             })}
           </select>
           <div className="mt-1 text-xs text-slate-500">
-            전체 예산은 모든 카테고리의 합 한도. 카테고리별 예산은 <b>최상위만</b> 가능
-            (자식 거래도 자동 합산).
+            전체 예산은 모든 카테고리의 합 한도. 카테고리별 예산은 최상위·자식 모두 가능
+            (자식 거래는 부모 합산에도 자동 포함).
           </div>
         </div>
 

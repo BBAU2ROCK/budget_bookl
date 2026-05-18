@@ -24,13 +24,23 @@ function buildAggregatedTotal(entries: BudgetVsActualEntry[]): BudgetVsActualEnt
   const cats = entries.filter((e) => !e.isTotalRow)
   if (cats.length === 0) return null
 
-  // 한도가 잡힌 카테고리만 effectiveBudget 합산. 미설정 카테고리는 actual만 카운트.
+  // 부모에 예산이 있는 자식은 합산에서 제외 (부모가 자식을 includesDescendants로 흡수).
+  // 부모가 없거나 부모에 예산이 없는 경우엔 자식 단독 예산을 합산.
+  // (식비 500K + 외식 200K → 외식 skip → 합 500K)
+  // (외식 200K만, 식비 무 → 외식 포함 → 합 200K)
+  const budgetedCatIds = new Set<string>()
+  for (const c of cats) {
+    if (c.categoryId && c.budgetId !== null) budgetedCatIds.add(c.categoryId)
+  }
+
   let effectiveBudget = 0
   let actual = 0
   let txCount = 0
   let hasAnyBudget = false
   let conversionWarning: 'none' | 'no_rate' = 'none'
   for (const c of cats) {
+    // 부모가 budgeted이면 자식의 예산/actual은 부모의 rolled-up에 포함되었으므로 skip.
+    if (c.parentCategoryId && budgetedCatIds.has(c.parentCategoryId)) continue
     if (c.status !== 'unset') {
       effectiveBudget += c.effectiveBudget
       hasAnyBudget = true

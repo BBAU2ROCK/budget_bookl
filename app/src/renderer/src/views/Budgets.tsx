@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { BudgetVsActualEntry, CategoryDto, CurrencyDto } from '../../../shared/types'
 import BudgetSummaryHeader from '../components/budgets/BudgetSummaryHeader'
-import BudgetCompactTable from '../components/budgets/BudgetCompactTable'
+import BudgetSummaryTable from '../components/budgets/BudgetSummaryTable'
+import BudgetTopSummary from '../components/budgets/BudgetTopSummary'
 import BudgetForm from '../components/budgets/BudgetForm'
 import BudgetCopyDialog from '../components/budgets/BudgetCopyDialog'
 import { useToast } from '../components/toast/ToastContext'
@@ -19,6 +20,9 @@ export default function Budgets(): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [createForCategory, setCreateForCategory] = useState<string | null>(null)
   const [copyOpen, setCopyOpen] = useState(false)
+  // 예산·거래 변경으로 entries가 갱신될 때마다 BudgetSummaryTable이 budgetVsActual을
+  // 재조회하도록 트리거.
+  const [dataVersion, setDataVersion] = useState(0)
   const globalToast = useToast()
 
   const load = useCallback(async () => {
@@ -32,6 +36,7 @@ export default function Budgets(): React.JSX.Element {
       setEntries(es)
       setCurrencies(ccy)
       setCategoriesAll(cats)
+      setDataVersion((v) => v + 1)
     } finally {
       setLoading(false)
     }
@@ -64,6 +69,30 @@ export default function Budgets(): React.JSX.Element {
     () => entries.filter((e) => !e.isTotalRow),
     [entries]
   )
+
+  // BudgetTopSummary에 전달할 예산 총액.
+  // - 사용자가 만든 "전체 예산"(totalRow)이 있으면 그 effectiveBudget 사용.
+  // - 없으면 카테고리 예산들의 effectiveBudget 합산.
+  //
+  // ⚠️ 중복 합산 회피 규칙: 부모에도 예산이 있는 자식은 합계에서 제외.
+  // (식비 500K + 외식 200K → 외식은 식비 안의 sub-cap → 총합 500K)
+  // 부모는 없고 자식만 예산이 있는 경우엔 자식이 합산됨 (사용자의 유효 cap).
+  // 다단(루트→중간→리프) 중 중간만 예산 비어있는 skip-level 케이스는 1단계 부모만
+  // 검사하므로 약간 과잉 합산될 수 있으나, 실 사용에선 드문 토폴로지.
+  const totalBudget = useMemo(() => {
+    if (totalEntry) return totalEntry.effectiveBudget
+    const budgetedCatIds = new Set<string>()
+    for (const e of tableEntries) {
+      if (e.categoryId && e.budgetId !== null) budgetedCatIds.add(e.categoryId)
+    }
+    let sum = 0
+    for (const e of tableEntries) {
+      if (e.status === 'unset') continue
+      if (e.parentCategoryId && budgetedCatIds.has(e.parentCategoryId)) continue
+      sum += e.effectiveBudget
+    }
+    return sum
+  }, [totalEntry, tableEntries])
 
   // BudgetForm에 넘기는 default period — 객체 리터럴을 매 렌더마다 새로 만들면
   // 폼 내부의 useEffect가 다시 호출돼 사용자 입력이 초기화될 위험이 있다.
@@ -136,6 +165,21 @@ export default function Budgets(): React.JSX.Element {
         </div>
       )}
 
+      {/*
+       * 4지표 전체 요약 — 예산 유무와 무관하게 표시 (수입·저축은 예산 없이도 의미 있는 정보).
+       * isEmpty 조건 밖으로 빼서 빈 상태에서도 가계 흐름을 한눈에 볼 수 있도록.
+       */}
+      {!loading && (
+        <BudgetTopSummary
+          year={year}
+          month={month}
+          baseCurrency={baseCurrency}
+          currencies={currencies}
+          totalBudget={totalBudget}
+          dataVersion={dataVersion}
+        />
+      )}
+
       {!loading && isEmpty && (
         <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/30 p-10 text-center">
           <div className="mb-3 text-3xl">📭</div>
@@ -176,17 +220,23 @@ export default function Budgets(): React.JSX.Element {
             noRateCategoryCount={noRateCategoryCount}
           />
 
-          <BudgetCompactTable
-            entries={tableEntries}
-            categories={categoriesAll}
-            baseCurrency={baseCurrency}
-            currencies={currencies}
+          <BudgetSummaryTable
             year={year}
             month={month}
-            onEditBudget={setEditingId}
-            onCreateBudgetForCategory={(cid) => {
-              setCreateForCategory(cid)
-              setCreating(true)
+            categories={categoriesAll}
+            currencies={currencies}
+            dataVersion={dataVersion}
+            onCategoryClick={(categoryId) => {
+              // 클릭한 카테고리(루트 또는 자식)에 예산이 있으면 편집, 없으면 등록 모달.
+              const matched = entries.find(
+                (e) => e.categoryId === categoryId && e.budgetId !== null
+              )
+              if (matched && matched.budgetId) {
+                setEditingId(matched.budgetId)
+              } else {
+                setCreateForCategory(categoryId)
+                setCreating(true)
+              }
             }}
           />
         </>
