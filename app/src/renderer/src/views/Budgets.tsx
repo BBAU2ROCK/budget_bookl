@@ -65,6 +65,11 @@ export default function Budgets(): React.JSX.Element {
     [entries]
   )
 
+  // BudgetForm에 넘기는 default period — 객체 리터럴을 매 렌더마다 새로 만들면
+  // 폼 내부의 useEffect가 다시 호출돼 사용자 입력이 초기화될 위험이 있다.
+  // useMemo로 (year, month)가 실제로 바뀔 때만 새 객체를 만든다.
+  const defaultPeriod = useMemo(() => ({ year, month }), [year, month])
+
   const monthsForPicker = useMemo(() => {
     const arr: Array<{ year: number; month: number; label: string }> = []
     const cursor = new Date()
@@ -188,10 +193,17 @@ export default function Budgets(): React.JSX.Element {
       )}
 
       {/* Modals */}
+      {/*
+       * key를 creating에 묶어 폼이 열릴 때마다 새 인스턴스로 마운트되도록 강제한다.
+       * 이전 BudgetForm 인스턴스의 useState가 다음 열기까지 살아남으면서 상태(이전
+       * 입력·이전 categoryTree·이전 currencies 등)가 누수되어 입력 칸이 비활성처럼
+       * 보이는 회귀가 관측됨 → 매 open마다 깨끗한 mount로 그런 모든 누수를 차단.
+       */}
       <BudgetForm
+        key={creating ? 'create-open' : 'create-closed'}
         open={creating}
         defaultCategoryId={createForCategory}
-        defaultPeriod={{ year, month }}
+        defaultPeriod={defaultPeriod}
         onClose={() => {
           setCreating(false)
           setCreateForCategory(null)

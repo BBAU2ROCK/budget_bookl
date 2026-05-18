@@ -5,7 +5,7 @@ import type {
   AccountType,
   CurrencyDto
 } from '../../../shared/types'
-import Modal from './Modal'
+import Modal, { ConfirmDialog } from './Modal'
 import { formatMoneyForInput, parseMoneyInput, formatLiveInput } from '../lib/money-input'
 
 const ACCOUNT_TYPES: Array<{ value: AccountType; label: string; icon: string }> = [
@@ -53,6 +53,8 @@ function AccountForm({
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // window.confirm() 대신 React 모달 — Electron webContents 입력 차단 회귀 회피.
+  const [confirmingArchive, setConfirmingArchive] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -185,10 +187,10 @@ function AccountForm({
     }
   }
 
-  async function handleArchive(): Promise<void> {
+  async function performArchive(): Promise<void> {
     if (!initial) return
-    if (!confirm(`'${initial.name}' 계좌를 보관하시겠습니까?`)) return
     await window.api.accounts.update({ id: initial.id, isArchived: !initial.isArchived })
+    setConfirmingArchive(false)
     onSaved()
     onClose()
   }
@@ -200,6 +202,7 @@ function AccountForm({
   )
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -209,7 +212,7 @@ function AccountForm({
         <>
           {initial && (
             <button
-              onClick={handleArchive}
+              onClick={() => setConfirmingArchive(true)}
               className="mr-auto rounded-md border border-amber-500/60 bg-amber-500/15 px-3 py-1.5 text-sm text-amber-200 hover:bg-amber-500/25"
             >
               {initial.isArchived ? '보관 해제' : '보관'}
@@ -448,6 +451,21 @@ function AccountForm({
         )}
       </div>
     </Modal>
+    {initial && (
+      <ConfirmDialog
+        open={confirmingArchive}
+        title={initial.isArchived ? '보관 해제' : '계좌 보관'}
+        confirmLabel={initial.isArchived ? '해제' : '보관'}
+        onCancel={() => setConfirmingArchive(false)}
+        onConfirm={performArchive}
+        message={
+          initial.isArchived
+            ? `'${initial.name}' 계좌의 보관을 해제하고 다시 활성 상태로 만듭니다.`
+            : `'${initial.name}' 계좌를 보관 처리합니다 (목록에서 숨김, 거래는 유지).`
+        }
+      />
+    )}
+    </>
   )
 }
 

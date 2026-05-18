@@ -48,3 +48,7 @@ yarn-error.log*
 # Manual build temp (keep PDF + screenshots, drop intermediates)
 01_docs/manual/__pycache__/
 01_docs/manual/*.pyc
+
+# Ad-hoc debug artifacts (video frames extracted via Python, etc.)
+.tmp_video_frames/
+.tmp_debug/

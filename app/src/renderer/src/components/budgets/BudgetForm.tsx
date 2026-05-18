@@ -1,11 +1,11 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type {
   BudgetCreateInput,
   BudgetDto,
   CategoryTreeNode,
   CurrencyDto
 } from '../../../../shared/types'
-import Modal from '../Modal'
+import Modal, { ConfirmDialog } from '../Modal'
 import { formatLiveInput, formatMoneyForInput, parseMoneyInput } from '../../lib/money-input'
 
 interface CategoryOption {
@@ -48,7 +48,18 @@ function BudgetForm({
   const [currencies, setCurrencies] = useState<CurrencyDto[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 삭제 확인은 window.confirm() 대신 React 모달로 처리한다.
+  // 네이티브 confirm()을 거치면 Electron(Chromium) webContents가 다음번 텍스트 입력
+  // 이벤트를 일부 차단하는 회귀가 관측됨 — 삭제 직후 같은 페이지의 다른 input에서
+  // keydown은 도달해도 beforeinput·input·change가 발화하지 않아 타이핑이 무시됨.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
+  // open이 false→true로 바뀔 때 한 번만 폼을 초기화한다.
+  // ⚠️ defaultPeriod / defaultCategoryId / 콜백 등은 부모가 매 렌더마다 새 객체·함수
+  // 레퍼런스를 만들기 쉬워서, 그것들을 deps에 넣으면 부모 재렌더(예: 토스트 dismiss,
+  // load()의 비동기 setState)마다 useEffect가 다시 실행되어 사용자 입력이 0으로
+  // 초기화되는 버그가 생긴다. 모달은 backdrop으로 다른 UI를 덮으므로, 폼이 열려 있는
+  // 동안 defaults가 바뀔 일은 실질적으로 없다 → open 단일 deps로 충분하다.
   useEffect(() => {
     if (!open) return
     Promise.all([window.api.categories.tree(), window.api.currencies.list()]).then(
@@ -76,25 +87,21 @@ function BudgetForm({
       setNotes('')
     }
     setError(null)
-  }, [open, initial, defaultCategoryId, defaultPeriod])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   useEffect(() => {
     if (!initial || currencies.length === 0) return
     setAmountStr(formatMoneyForInput(initial.amount, initial.currency, currencies))
   }, [initial, currencies])
 
-  // Flatten the expense subtree, preserving traversal order with depth info.
-  // Archived nodes (and their subtrees) are skipped so their depth labels
-  // don't become misleading.
+  // 예산은 최상위(루트) 지출 카테고리에만 설정한다 — 자식 카테고리에 한도를 잡으면
+  // "하위 카테고리 거래도 합산" 옵션이 의미가 모호해지고, 사용자가 같은 비용을 부모에
+  // 한 번 자식에 한 번 두 번 잡는 등의 혼동이 생긴다. 따라서 드롭다운은 루트만 노출.
   const expenseCategoryOptions = useMemo<CategoryOption[]>(() => {
-    const out: CategoryOption[] = []
-    const walk = (n: CategoryTreeNode): void => {
-      if (n.kind !== 'expense' || n.isArchived) return
-      out.push({ id: n.id, name: n.name, icon: n.icon, depth: n.depth, path: n.path })
-      n.children.forEach(walk)
-    }
-    categoryTree.forEach(walk)
-    return out
+    return categoryTree
+      .filter((n) => n.kind === 'expense' && !n.isArchived)
+      .map((n) => ({ id: n.id, name: n.name, icon: n.icon, depth: 0, path: n.path }))
   }, [categoryTree])
 
   async function handleSubmit(): Promise<void> {
@@ -128,10 +135,10 @@ function BudgetForm({
     }
   }
 
-  async function handleDelete(): Promise<void> {
+  async function performDelete(): Promise<void> {
     if (!initial) return
-    if (!confirm('이 예산을 삭제하시겠습니까?')) return
     await window.api.budgets.delete(initial.id)
+    setConfirmingDelete(false)
     onDeleted?.()
     onClose()
   }
@@ -139,6 +146,7 @@ function BudgetForm({
   if (!open) return null
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -148,7 +156,7 @@ function BudgetForm({
         <>
           {initial && (
             <button
-              onClick={handleDelete}
+              onClick={() => setConfirmingDelete(true)}
               className="mr-auto rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-1.5 text-sm text-rose-200 hover:bg-rose-500/25"
             >
               삭제
@@ -170,8 +178,14 @@ function BudgetForm({
         </>
       }
     >
+      {/*
+       * 형제 elements에 명시적 key를 부여해 React가 위치가 아닌 key 기반으로
+       * reconciliation 하도록 강제. {categoryId && ...} 같은 조건부 렌더가
+       * 들어왔다 빠질 때 위치가 밀려서 input/textarea가 의도치 않게 remount되어
+       * 포커스가 빠지는 회귀를 차단.
+       */}
       <div className="space-y-3 text-sm">
-        <div>
+        <div key="cat-section">
           <label className="mb-1 block text-xs text-slate-400">카테고리</label>
           <select
             value={categoryId ?? ''}
@@ -180,8 +194,6 @@ function BudgetForm({
           >
             <option value="">(전체 예산)</option>
             {expenseCategoryOptions.map((c) => {
-              // <option>은 일반 공백을 collapse하므로 NBSP(U+00A0) 3개 / 깊이로 들여쓰기.
-              // 자식 노드에는 트리 코너 '└ ' 접두어.
               const indent = '   '.repeat(c.depth)
               const prefix = c.depth > 0 ? '└ ' : ''
               const icon = c.icon ? `${c.icon} ` : ''
@@ -193,11 +205,12 @@ function BudgetForm({
             })}
           </select>
           <div className="mt-1 text-xs text-slate-500">
-            전체 예산은 모든 카테고리의 합 한도. 카테고리 예산은 그 카테고리만.
+            전체 예산은 모든 카테고리의 합 한도. 카테고리별 예산은 <b>최상위만</b> 가능
+            (자식 거래도 자동 합산).
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div key="period-section" className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-xs text-slate-400">연도</label>
             <input
@@ -229,7 +242,7 @@ function BudgetForm({
           </div>
         </div>
 
-        <div>
+        <div key="amount-section">
           <label className="mb-1 block text-xs text-slate-400">예산 금액</label>
           <div className="flex gap-2">
             <input
@@ -261,18 +274,18 @@ function BudgetForm({
         </div>
 
         {categoryId && (
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+          <label key="include-desc-toggle" className="flex items-center gap-2 text-sm text-slate-300">
             <input
               type="checkbox"
               checked={includesDescendants}
               onChange={(e) => setIncludesDescendants(e.target.checked)}
               className="h-4 w-4"
             />
-            <span>하위 카테고리 거래도 합산</span>
+            <span>하위 카테고리 거래도 합산 (보통 켜둠)</span>
           </label>
         )}
 
-        <label className="flex items-center gap-2 text-sm text-slate-300">
+        <label key="carry-over-toggle" className="flex items-center gap-2 text-sm text-slate-300">
           <input
             type="checkbox"
             checked={carryOver}
@@ -282,7 +295,7 @@ function BudgetForm({
           <span>다음 달로 미사용 잔액 이월</span>
         </label>
 
-        <div>
+        <div key="notes-section">
           <label className="mb-1 block text-xs text-slate-400">메모 (선택)</label>
           <textarea
             value={notes}
@@ -293,13 +306,23 @@ function BudgetForm({
         </div>
 
         {error && (
-          <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+          <div key="error-banner" className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
             {error}
           </div>
         )}
       </div>
     </Modal>
+    <ConfirmDialog
+      open={confirmingDelete}
+      title="예산 삭제"
+      danger
+      confirmLabel="삭제"
+      onCancel={() => setConfirmingDelete(false)}
+      onConfirm={performDelete}
+      message="이 예산을 영구 삭제합니다. 계속하시겠습니까?"
+    />
+    </>
   )
 }
 
-export default memo(BudgetForm)
+export default BudgetForm

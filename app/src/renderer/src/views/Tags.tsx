@@ -3,6 +3,7 @@ import type { TagDto } from '../../../shared/types'
 import TagForm from '../components/TagForm'
 import InfoTip from '../components/InfoTip'
 import Modal, { ConfirmDialog } from '../components/Modal'
+import { useToast } from '../components/toast/ToastContext'
 import { formatInteger } from '../lib/money'
 
 export default function Tags(): React.JSX.Element {
@@ -287,6 +288,7 @@ function MergeTagDialog({
 }): React.JSX.Element | null {
   const [targetId, setTargetId] = useState<string>('')
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
 
   useEffect(() => {
     setTargetId('')
@@ -297,11 +299,14 @@ function MergeTagDialog({
     setBusy(true)
     try {
       const r = await window.api.tags.merge(source.id, targetId)
-      alert(`${r.moved}건의 거래가 이전되었습니다. 소스 태그는 삭제되었습니다.`)
+      toast.show({
+        tone: 'success',
+        message: `${r.moved}건의 거래가 이전되었습니다. 소스 태그는 삭제되었습니다.`
+      })
       onMerged()
       onClose()
     } catch (e) {
-      alert((e as Error).message)
+      toast.show({ tone: 'error', message: (e as Error).message })
     } finally {
       setBusy(false)
     }

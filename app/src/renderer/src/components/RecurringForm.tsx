@@ -6,7 +6,7 @@ import type {
   RecurringCreateInput,
   RecurringSeriesDto
 } from '../../../shared/types'
-import Modal from './Modal'
+import Modal, { ConfirmDialog } from './Modal'
 import CategoryPicker from './CategoryPicker'
 import TagMultiSelect from './TagMultiSelect'
 import { formatMoneyForInput, parseMoneyInput, formatLiveInput } from '../lib/money-input'
@@ -59,6 +59,8 @@ function RecurringForm({
   const [previewDates, setPreviewDates] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // window.confirm() 대신 React 모달 — Electron webContents 입력 차단 회귀 회피.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -220,10 +222,10 @@ function RecurringForm({
     }
   }
 
-  async function handleDelete(): Promise<void> {
+  async function performDelete(): Promise<void> {
     if (!initial) return
-    if (!confirm('이 반복 시리즈를 삭제하시겠습니까? 기존 거래는 유지됩니다.')) return
     await window.api.recurring.delete(initial.id)
+    setConfirmingDelete(false)
     onDeleted?.()
     onClose()
   }
@@ -241,7 +243,7 @@ function RecurringForm({
           <>
             {initial && (
               <button
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 className="mr-auto rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-1.5 text-sm text-rose-200 hover:bg-rose-500/25"
               >
                 삭제
@@ -546,6 +548,16 @@ function RecurringForm({
         selectedId={categoryId}
         onPick={setCategoryId}
         onClose={() => setPickerOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="반복 시리즈 삭제"
+        danger
+        confirmLabel="삭제"
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={performDelete}
+        message="이 반복 시리즈를 삭제합니다. 기존에 자동 생성된 거래는 그대로 남습니다."
       />
     </>
   )

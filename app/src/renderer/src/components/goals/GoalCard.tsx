@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CurrencyDto, GoalProgressDto, SavingsGoalDto } from '../../../../shared/types'
 import { formatInteger, formatMoney } from '../../lib/money'
+import { ConfirmDialog } from '../Modal'
 import GoalProgressBar from './GoalProgressBar'
 import GoalSourceBreakdown from './GoalSourceBreakdown'
 import GoalPaceInfo from './GoalPaceInfo'
@@ -31,6 +32,9 @@ export default function GoalCard({
   onDelete
 }: Props): React.JSX.Element {
   const [expanded, setExpanded] = useState(false)
+  // window.confirm() 대신 React 모달 — Electron webContents 입력 차단 회귀 회피.
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const c = goal.currency
   const isAchieved = progress.percent >= 100
   const isOverdue = progress.paceStatus === 'overdue'
@@ -146,10 +150,7 @@ export default function GoalCard({
         )}
         {goal.status === 'active' && (
           <button
-            onClick={() => {
-              if (!confirm('이 목표를 취소하시겠습니까?')) return
-              onChangeStatus('cancelled')
-            }}
+            onClick={() => setConfirmingCancel(true)}
             className="rounded-md border border-slate-600 bg-slate-800/60 px-3 py-1 text-xs text-slate-400 hover:bg-slate-700"
           >
             취소
@@ -164,15 +165,36 @@ export default function GoalCard({
           </button>
         )}
         <button
-          onClick={() => {
-            if (!confirm('이 목표를 영구 삭제하시겠습니까?')) return
-            onDelete()
-          }}
+          onClick={() => setConfirmingDelete(true)}
           className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-1 text-xs text-rose-300 hover:bg-rose-500/20"
         >
           🗑
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmingCancel}
+        title="목표 취소"
+        confirmLabel="취소 처리"
+        onCancel={() => setConfirmingCancel(false)}
+        onConfirm={() => {
+          setConfirmingCancel(false)
+          onChangeStatus('cancelled')
+        }}
+        message="이 목표를 「취소됨」 상태로 바꿉니다 (필요하면 나중에 재개 가능)."
+      />
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="목표 삭제"
+        danger
+        confirmLabel="영구 삭제"
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() => {
+          setConfirmingDelete(false)
+          onDelete()
+        }}
+        message="이 목표를 영구 삭제합니다. 계속하시겠습니까?"
+      />
     </div>
   )
 }

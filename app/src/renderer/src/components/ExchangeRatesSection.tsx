@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CurrencyDto, ExchangeRateDto } from '../../../shared/types'
 import { useToast } from './toast/ToastContext'
+import { ConfirmDialog } from './Modal'
 
 export default function ExchangeRatesSection(): React.JSX.Element {
   const [rates, setRates] = useState<ExchangeRateDto[]>([])
@@ -18,6 +19,8 @@ export default function ExchangeRatesSection(): React.JSX.Element {
   const [autoEnabled, setAutoEnabled] = useState(false)
   const [lastRunAt, setLastRunAt] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  // window.confirm() 대신 React 모달 — Electron webContents 입력 차단 회귀 회피.
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const toast = useToast()
 
@@ -97,11 +100,12 @@ export default function ExchangeRatesSection(): React.JSX.Element {
     }
   }
 
-  async function handleDelete(id: string): Promise<void> {
-    if (!confirm('이 환율 항목을 삭제하시겠습니까?')) return
+  async function performDelete(): Promise<void> {
+    if (!deletingId) return
     setBusy(true)
     try {
-      await window.api.currencies.deleteRate(id)
+      await window.api.currencies.deleteRate(deletingId)
+      setDeletingId(null)
       await load()
     } finally {
       setBusy(false)
@@ -109,6 +113,7 @@ export default function ExchangeRatesSection(): React.JSX.Element {
   }
 
   return (
+    <>
     <section className="rounded-xl border border-slate-700/70 bg-slate-900/50 p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -255,7 +260,7 @@ export default function ExchangeRatesSection(): React.JSX.Element {
                   <td className="px-3 py-2 text-xs text-slate-500">{r.source}</td>
                   <td className="px-3 py-2 text-right">
                     <button
-                      onClick={() => handleDelete(r.id)}
+                      onClick={() => setDeletingId(r.id)}
                       disabled={busy}
                       title="삭제"
                       className="text-slate-500 hover:text-rose-300 disabled:opacity-30"
@@ -270,5 +275,15 @@ export default function ExchangeRatesSection(): React.JSX.Element {
         </div>
       )}
     </section>
+    <ConfirmDialog
+      open={!!deletingId}
+      title="환율 삭제"
+      danger
+      confirmLabel="삭제"
+      onCancel={() => setDeletingId(null)}
+      onConfirm={performDelete}
+      message="이 환율 항목을 영구 삭제합니다. 같은 통화 쌍의 다른 날짜 환율은 영향받지 않습니다."
+    />
+    </>
   )
 }

@@ -7,6 +7,7 @@ import type {
 import CategoryForm from '../components/CategoryForm'
 import InfoTip from '../components/InfoTip'
 import { ConfirmDialog } from '../components/Modal'
+import { useToast } from '../components/toast/ToastContext'
 import { formatInteger } from '../lib/money'
 
 type EditorState =
@@ -34,6 +35,7 @@ export default function Categories(): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragTarget, setDragTarget] = useState<DragTarget>(null)
+  const toast = useToast()
 
   const load = useCallback(async () => {
     const [t, f] = await Promise.all([
@@ -143,14 +145,20 @@ export default function Categories(): React.JSX.Element {
     const tgtCat = flat.find((c) => c.id === target.id)
     if (!dragCat || !tgtCat) return
     if (dragCat.kind !== tgtCat.kind) {
-      alert('같은 분류(지출/수입) 내에서만 이동할 수 있습니다.')
+      toast.show({
+        tone: 'warning',
+        message: '같은 분류(지출/수입) 내에서만 이동할 수 있습니다.'
+      })
       return
     }
     if (target.position !== 'inside' && tgtCat.parentId !== dragCat.parentId) {
       // moving across parents ok, but still check descendant
     }
     if (isDescendant(tgtCat.id, dragCat.id)) {
-      alert('하위 카테고리를 그 상위의 자손 위로 이동할 수 없습니다.')
+      toast.show({
+        tone: 'warning',
+        message: '하위 카테고리를 그 상위의 자손 위로 이동할 수 없습니다.'
+      })
       return
     }
 

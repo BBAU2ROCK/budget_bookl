@@ -132,6 +132,34 @@ export const budgetsRepo = {
       validateMonth(rest.periodYear, rest.periodMonth)
     }
 
+    // categoryId 또는 period가 바뀐다면, 같은 (categoryId, year, month) 조합이 이미
+    // 다른 행에 있으면 중복이 만들어진다. 테이블에 UNIQUE 제약이 없어서 DB 레벨로는
+    // 막히지 않으므로 앱 레벨에서 사전 검사한다.
+    const current = db.select().from(budgets).where(eq(budgets.id, id)).get()
+    if (!current) throw new Error(`Budget ${id} not found`)
+    const newCategoryId = rest.categoryId === undefined ? current.categoryId : (rest.categoryId ?? null)
+    const newYear = rest.periodYear ?? current.periodYear
+    const newMonth = rest.periodMonth ?? current.periodMonth
+    const movedToDifferentSlot =
+      newCategoryId !== current.categoryId ||
+      newYear !== current.periodYear ||
+      newMonth !== current.periodMonth
+    if (movedToDifferentSlot) {
+      const candidates = db
+        .select()
+        .from(budgets)
+        .where(and(eq(budgets.periodYear, newYear), eq(budgets.periodMonth, newMonth)))
+        .all()
+      const dup = candidates.find(
+        (r) => r.id !== id && (r.categoryId ?? null) === newCategoryId
+      )
+      if (dup) {
+        throw new Error(
+          `${newYear}년 ${newMonth}월에 이미 같은 카테고리의 예산이 있습니다.`
+        )
+      }
+    }
+
     db.update(budgets)
       .set({ ...rest, updatedAt: new Date() })
       .where(eq(budgets.id, id))

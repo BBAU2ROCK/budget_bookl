@@ -8,7 +8,7 @@ import type {
   SavingsGoalDto,
   TagDto
 } from '../../../../shared/types'
-import Modal from '../Modal'
+import Modal, { ConfirmDialog } from '../Modal'
 import { formatLiveInput, formatMoneyForInput, parseMoneyInput } from '../../lib/money-input'
 
 interface Props {
@@ -63,6 +63,9 @@ function GoalForm({
   const [tags, setTags] = useState<TagDto[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // window.confirm()을 거치면 Electron webContents가 다음번 텍스트 입력 이벤트를
+  // 일부 차단하는 회귀가 있다 → React 모달로 처리.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -199,10 +202,10 @@ function GoalForm({
     }
   }
 
-  async function handleDelete(): Promise<void> {
+  async function performDelete(): Promise<void> {
     if (!initial) return
-    if (!confirm('이 목표를 영구 삭제하시겠습니까?')) return
     await window.api.goals.delete(initial.id)
+    setConfirmingDelete(false)
     onDeleted?.()
     onClose()
   }
@@ -210,6 +213,7 @@ function GoalForm({
   if (!open) return null
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -219,7 +223,7 @@ function GoalForm({
         <>
           {initial && (
             <button
-              onClick={handleDelete}
+              onClick={() => setConfirmingDelete(true)}
               className="mr-auto rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-1.5 text-sm text-rose-200 hover:bg-rose-500/25"
             >
               삭제
@@ -486,6 +490,16 @@ function GoalForm({
         )}
       </div>
     </Modal>
+    <ConfirmDialog
+      open={confirmingDelete}
+      title="목표 삭제"
+      danger
+      confirmLabel="영구 삭제"
+      onCancel={() => setConfirmingDelete(false)}
+      onConfirm={performDelete}
+      message="이 목표를 영구 삭제합니다. 계속하시겠습니까?"
+    />
+    </>
   )
 }
 
