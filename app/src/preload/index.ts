@@ -23,6 +23,8 @@ import type {
   CategoryReorderInput,
   CategoryTreeNode,
   CategoryUpdateInput,
+  BudgetExportInput,
+  BudgetExportResult,
   CsvExportInput,
   CsvExportResult,
   CsvImportResult,
@@ -246,7 +248,9 @@ export const api = {
     importDb: (): Promise<BackupImportResult | null> => invoke(IPC.BACKUP_IMPORT_DB),
     exportCsv: (input: CsvExportInput = {}): Promise<CsvExportResult | null> =>
       invoke(IPC.EXPORT_TRANSACTIONS_CSV, input),
-    importCsv: (): Promise<CsvImportResult | null> => invoke(IPC.IMPORT_TRANSACTIONS_CSV)
+    importCsv: (): Promise<CsvImportResult | null> => invoke(IPC.IMPORT_TRANSACTIONS_CSV),
+    exportBudgetXlsx: (input: BudgetExportInput): Promise<BudgetExportResult | null> =>
+      invoke(IPC.EXPORT_BUDGET_XLSX, input)
   },
   reset: {
     transactionsOnly: (): Promise<ResetResult> => invoke(IPC.RESET_TRANSACTIONS),

@@ -148,6 +148,27 @@ export default function Budgets(): React.JSX.Element {
             📋 다른 달에서 복사
           </button>
           <button
+            onClick={async () => {
+              try {
+                const r = await window.api.backup.exportBudgetXlsx({ year, month })
+                if (!r) return
+                globalToast.show({
+                  tone: 'success',
+                  message: `엑셀 저장 완료 (${r.rowCount}개 카테고리)`
+                })
+              } catch (e) {
+                globalToast.show({
+                  tone: 'error',
+                  message: `엑셀 저장 실패: ${(e as Error).message}`
+                })
+              }
+            }}
+            className="rounded-md border border-emerald-500/60 bg-emerald-500/15 px-3 py-1.5 text-sm text-emerald-200 hover:bg-emerald-500/25"
+            title="이번 달 예산·진행상황·카테고리별 상세를 엑셀(.xlsx) 파일로 저장"
+          >
+            📥 엑셀 다운로드
+          </button>
+          <button
             onClick={() => {
               setCreating(true)
               setCreateForCategory(null)

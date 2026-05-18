@@ -83,6 +83,7 @@ export const IPC = {
   BACKUP_IMPORT_DB: 'backup:importDb',
   EXPORT_TRANSACTIONS_CSV: 'export:transactionsCsv',
   IMPORT_TRANSACTIONS_CSV: 'import:transactionsCsv',
+  EXPORT_BUDGET_XLSX: 'export:budgetXlsx',
 
   // Reset
   RESET_TRANSACTIONS: 'reset:transactions',

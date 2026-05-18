@@ -28,6 +28,21 @@ export interface CsvImportResult {
   errors: Array<{ row: number; message: string }>
 }
 
+/* =========================================================================
+ * Budget Excel export (v0.1.16)
+ * =========================================================================*/
+
+export interface BudgetExportInput {
+  year: number
+  month: number
+}
+
+export interface BudgetExportResult {
+  savedPath: string
+  /** 시트에 출력된 카테고리 행 수 (합계 행 제외) */
+  rowCount: number
+}
+
 export type ResetMode = 'transactions' | 'all'
 
 export interface ResetResult {
