@@ -10,6 +10,8 @@ import Recurring from './views/Recurring'
 import BackupSettings from './views/BackupSettings'
 import DbSmokeTest from './components/DbSmokeTest'
 import { ToastProvider } from './components/toast/ToastContext'
+import { AuthProvider, useAuth } from './components/auth/AuthContext'
+import LoginScreen from './components/auth/LoginScreen'
 
 type Route =
   | 'dashboard'
@@ -43,10 +45,40 @@ const NAV: Array<{ key: Route; label: string; icon: string }> = IS_DEV
   : BASE_NAV
 
 function App(): React.JSX.Element {
+  return (
+    <AuthProvider>
+      <ToastProvider>
+        <AuthGate />
+      </ToastProvider>
+    </AuthProvider>
+  )
+}
+
+/**
+ * 인증 상태에 따라 LoginScreen / Loading / 메인앱 분기.
+ * - loading: 인증 토큰 확인 중 (Firebase 초기화 ~1초)
+ * - user === null: 로그인 화면
+ * - user !== null: 메인 앱
+ */
+function AuthGate(): React.JSX.Element {
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!user) return <LoginScreen />
+  return <MainApp />
+}
+
+function LoadingScreen(): React.JSX.Element {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-400">
+      <div className="text-sm">불러오는 중…</div>
+    </div>
+  )
+}
+
+function MainApp(): React.JSX.Element {
   const [route, setRoute] = useState<Route>('dashboard')
 
   return (
-    <ToastProvider>
     <div className="flex min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <Sidebar route={route} setRoute={setRoute} />
       <main className="flex-1 overflow-y-auto">
@@ -72,7 +104,6 @@ function App(): React.JSX.Element {
         </div>
       </main>
     </div>
-    </ToastProvider>
   )
 }
 
@@ -83,14 +114,15 @@ function Sidebar({
   route: Route
   setRoute: (r: Route) => void
 }): React.JSX.Element {
+  const { user, signOutUser } = useAuth()
   return (
-    <aside className="w-56 shrink-0 border-r border-slate-800 bg-slate-950/60 px-4 py-6">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-slate-800 bg-slate-950/60 px-4 py-6">
       <div className="mb-8 px-2">
         <div className="bg-gradient-to-br from-sky-400 via-indigo-300 to-fuchsia-300 bg-clip-text text-2xl font-extrabold tracking-tight text-transparent">
           BudgetBook
         </div>
         <div className="text-[10px] uppercase tracking-wider text-slate-500">
-          오프라인 가계부
+          가족 공유 가계부
         </div>
       </div>
       <nav className="space-y-1">
@@ -109,6 +141,37 @@ function Sidebar({
           </button>
         ))}
       </nav>
+      {user && (
+        <div className="mt-auto border-t border-slate-800 px-2 pt-4">
+          <div className="mb-2 flex items-center gap-2">
+            {user.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt={user.displayName ?? user.email ?? 'user'}
+                className="h-7 w-7 rounded-full border border-slate-700"
+              />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-xs text-slate-300">
+                {(user.displayName ?? user.email ?? '?').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs text-slate-200">
+                {user.displayName ?? user.email}
+              </div>
+              {user.displayName && (
+                <div className="truncate text-[10px] text-slate-500">{user.email}</div>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => void signOutUser()}
+            className="w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-400 transition hover:bg-slate-800/60 hover:text-slate-200"
+          >
+            🚪 로그아웃
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

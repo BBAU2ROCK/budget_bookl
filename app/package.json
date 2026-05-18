@@ -1,7 +1,7 @@
 {
   "name": "budgetbook",
-  "version": "0.1.15",
-  "description": "BudgetBook - Offline desktop personal budget manager",
+  "version": "0.2.0-dev",
+  "description": "BudgetBook - Cloud-synced family budget manager",
   "main": "./out/main/index.js",
   "author": "jwchoo",
   "homepage": "https://github.com/jwchoo/budgetbook",
@@ -26,6 +26,7 @@
     "better-sqlite3": "^12.9.0",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.2",
+    "firebase": "^12.13.0",
     "nanoid": "^5.1.7",
     "recharts": "^3.8.1",
     "rrule": "^2.8.1"

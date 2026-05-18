@@ -1,0 +1,31 @@
+// BudgetBook v0.2.0 Firestore 보안 규칙 — 가족 화이트리스트 모델
+//
+// ⚠️ 배포 전 반드시 수정 — `ALLOWED_EMAILS` 리스트에 마님 + 본인 실제 이메일 채워야 함.
+// 현재는 placeholder. 실제 이메일 받으면 채팅에서 Claude가 자동 업데이트.
+//
+// 배포: `firebase deploy --only firestore:rules`
+// 테스트: Firebase Console → Firestore → 규칙 → "Rules Playground"
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 가족 구성원 화이트리스트 — 이 두 이메일만 데이터 접근 가능
+    function isFamilyMember() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          // TODO: 마님 실제 Gmail 채우기
+          "wife-email@gmail.com",
+          // TODO: 본인 실제 Gmail 채우기
+          "husband-email@gmail.com"
+        ];
+    }
+
+    // 모든 BudgetBook 컬렉션은 가족 구성원에게만 read/write 허용
+    // (transactions, categories, budgets, tags, accounts, recurring, savings_goals, settings 등)
+    match /{collection}/{doc=**} {
+      allow read, write: if isFamilyMember();
+    }
+  }
+}
