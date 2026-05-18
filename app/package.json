@@ -1,6 +1,6 @@
 {
   "name": "budgetbook",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "BudgetBook - Offline desktop personal budget manager",
   "main": "./out/main/index.js",
   "author": "jwchoo",

@@ -10,6 +10,7 @@ import type {
 } from '../../../shared/types'
 import { formatInteger, formatMoney } from '../lib/money'
 import TransactionForm from '../components/TransactionForm'
+import TransactionsBudgetPanel from '../components/transactions/TransactionsBudgetPanel'
 import { ConfirmDialog } from '../components/Modal'
 import { useToast } from '../components/toast/ToastContext'
 import InfoTip from '../components/InfoTip'
@@ -231,6 +232,10 @@ export default function Transactions(): React.JSX.Element {
   const [editing, setEditing] = useState<TransactionDto | null>(null)
   const [creating, setCreating] = useState(false)
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  // 우측 예산 현황 사이드 패널
+  const [budgetPanelOpen, setBudgetPanelOpen] = useState(false)
+  // 패널의 budgetVsActual 재조회를 위한 카운터 (load() 호출 후 증가)
+  const [dataVersion, setDataVersion] = useState(0)
 
   const toast = useToast()
 
@@ -293,6 +298,8 @@ export default function Transactions(): React.JSX.Element {
       for (const id of prev) if (visible.has(id)) next.add(id)
       return next
     })
+    // 사이드 예산 패널이 budgetVsActual을 재조회하도록 신호.
+    setDataVersion((v) => v + 1)
   }, [viewMonth, debouncedSearch, advanced, isFiltering])
 
   useEffect(() => {
@@ -495,6 +502,17 @@ export default function Transactions(): React.JSX.Element {
                 {activeFilterCount}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setBudgetPanelOpen((v) => !v)}
+            className={`rounded-md border px-3 py-1.5 text-sm ${
+              budgetPanelOpen
+                ? 'border-amber-500/60 bg-amber-500/15 text-amber-200'
+                : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+            }`}
+            title="이번달 예산 현황 (최상위 카테고리별 합산)"
+          >
+            📊 예산
           </button>
           <button
             onClick={() => setCreating(true)}
@@ -739,6 +757,22 @@ export default function Transactions(): React.JSX.Element {
         onDeleted={() => {
           load()
           toast.show({ tone: 'success', message: '거래가 삭제되었습니다.' })
+        }}
+      />
+
+      <TransactionsBudgetPanel
+        open={budgetPanelOpen}
+        onClose={() => setBudgetPanelOpen(false)}
+        year={parseInt(viewMonth.slice(0, 4), 10)}
+        month={parseInt(viewMonth.slice(5, 7), 10)}
+        categories={categories}
+        currencies={currencies}
+        dataVersion={dataVersion}
+        onCategoryClick={(rootCategoryId) => {
+          // 그 루트 카테고리만 선택 상태로 필터 적용 → 자손까지 자동 합산 (Transactions의
+          // expandToDescendants 로직이 처리). 패널은 계속 열어둔 채.
+          setAdvanced((prev) => ({ ...prev, categoryIds: [rootCategoryId] }))
+          setFilterOpen(true)
         }}
       />
     </div>
